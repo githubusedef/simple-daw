@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Audio Workstation with Sampler</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #fff;
+            margin: 20px;
+        }
+
+        .sampler {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 10px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(16, 40px);
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .grid div {
+            width: 40px;
+            height: 40px;
+            background-color: #333;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .grid div.active {
+            background-color: #1db954;
+        }
+
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #1db954;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #1ed760;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Digital Audio Workstation with Sampler</h1>
+
+    <div class="sampler">
+        <h2>Sampler</h2>
+        <div class="controls">
+            <button onclick="loadAudio()">Load Sample</button>
+            <input id="audioInput" type="file" accept="audio/*" onchange="handleAudioInput(event)">
+            <button onclick="playSequence()">Play Sequence</button>
+        </div>
+        <div id="grid" class="grid"></div>
+    </div>
+
+    <script>
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        let audioBuffer = null;
+        const grid = document.getElementById('grid');
+        const rows = 8; // 8 pitches
+        const cols = 16; // 16 steps
+        const stepDuration = 0.25; // Quarter second per step
+        const notes = []; // Store note grid (rows x cols)
+
+        // Initialize grid and notes
+        for (let row = 0; row < rows; row++) {
+            notes[row] = [];
+            for (let col = 0; col < cols; col++) {
+                notes[row][col] = false;
+
+                const cell = document.createElement('div');
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                cell.addEventListener('click', () => toggleCell(cell, row, col));
+                grid.appendChild(cell);
+            }
+        }
+
+        grid.style.gridTemplateRows = `repeat(${rows}, 40px)`;
+
+        // Toggle cell active state
+        function toggleCell(cell, row, col) {
+            notes[row][col] = !notes[row][col];
+            cell.classList.toggle('active', notes[row][col]);
+        }
+
+        // Load audio sample
+        function loadAudio() {
+            document.getElementById('audioInput').click();
+        }
+
+        function handleAudioInput(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function () {
+                const arrayBuffer = reader.result;
+                audioBuffer = await context.decodeAudioData(arrayBuffer);
+                alert('Sample loaded!');
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Play sequence
+        function playSequence() {
+            if (!audioBuffer) {
+                alert('Please load a sample first!');
+                return;
+            }
+
+            let currentTime = context.currentTime;
+
+            for (let col = 0; col < cols; col++) {
+                for (let row = 0; row < rows; row++) {
+                    if (notes[row][col]) {
+                        playSample(currentTime + col * stepDuration, row);
+                    }
+                }
+            }
+        }
+
+        // Play a sample with pitch adjustment
+        function playSample(startTime, pitch) {
+            const source = context.createBufferSource();
+            source.buffer = audioBuffer;
+
+            // Adjust playback rate for pitch
+            const pitchShift = Math.pow(2, (pitch - 4) / 12); // Middle row = original pitch
+            source.playbackRate.value = pitchShift;
+
+            source.connect(context.destination);
+            source.start(startTime);
+        }
+    </script>
+</body>
+</html>
